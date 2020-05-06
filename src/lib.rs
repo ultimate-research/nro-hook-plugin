@@ -21,7 +21,9 @@ pub fn handle_load_module(
     buffer_size: size_t, 
     flag: c_int
 ) -> c_int {
-    let ret = original!()(out_module, image, buffer, buffer_size, flag);
+    // use Flag_Now to ensure we aren't lazy loading NROs
+    // causes slower load times but is necessary for hooking
+    let ret = original!()(out_module, image, buffer, buffer_size, ro::BindFlag_BindFlag_Now as i32);
 
     let name = unsafe { from_c_str(&(*out_module).Name as *const u8) };
     println!("Test test test {}", name);
