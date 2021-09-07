@@ -1,32 +1,53 @@
-name: Rust Build
+name: Rust
 
 on:
   push:
     branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
 jobs:
-  build:
-
+  plugin:
+    env:
+      PLUGIN_NAME: nro_hook
     runs-on: ubuntu-latest
-
+    container: 
+      image: devkitpro/devkita64:latest
     steps:
     - uses: actions/checkout@v2
-    - name: Install cargo-skyline
-      run: cargo install --git https://github.com/jam1garner/cargo-skyline
-    - name: Install rust-std-skyline-squashed
-      run: cd .. && git clone https://github.com/jam1garner/rust-std-skyline-squashed && cd -
-    - name: Attempt to build
-      run: PATH=$PATH:/usr/share/rust/.rustup/toolchains/nightly-2020-04-10-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/bin cargo skyline build --release
-    - name: Update Release
-      env:
-        PLUGIN_NAME: 'libnro_hook.nro'  #  change this to the name of your plugin
-      uses: meeDamian/github-release@2.0
+    - name: install
+      run: |
+        curl https://sh.rustup.rs -sSf > /tmp/rustup-init.sh     && chmod +x /tmp/rustup-init.sh     && sh /tmp/rustup-init.sh -y     && rm -rf /tmp/rustup-init.sh # buildkit
+    - name: install 2
+      run: |
+        apt update &&  apt install -y build-essential   apt-utils     curl     gcc     libssl-dev     cmake     pkg-config       &&  ~/.cargo/bin/rustup install stable && ~/.cargo/bin/cargo install cargo-skyline && ~/.cargo/bin/cargo skyline update-std
+    - name: Build release NRO
+      run: |
+        PATH=$PATH:/root/.cargo/bin:/opt/devkitpro/tools/bin  RUST_BACKTRACE=1 ~/.cargo/bin/cargo skyline build --release
+    - name: Upload plugin artifact
+      uses: actions/upload-artifact@v2
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        prerelease: true
-        allow_override: true
-        gzip: false
-        tag: master
-        name: master
-        body: Build of ${{env.PLUGIN_NAME}} from master.
-        files: >
-          ./target/aarch64-skyline-switch/release/${{env.PLUGIN_NAME}}
+        name: plugin
+        path: target/aarch64-skyline-switch/release/lib${{env.PLUGIN_NAME}}.nro
+#   upload:
+#     runs-on: ubuntu-latest
+#     if: github.ref == 'refs/heads/master'
+#     needs:
+#       - plugin
+#     steps:
+#     - name: Download all artifacts
+#       uses: actions/download-artifact@v2
+#     - name: Update Release
+#       uses: meeDamian/github-release@2.0
+#       with:
+#         token: ${{ secrets.GITHUB_TOKEN }}
+#         prerelease: true
+#         allow_override: true
+#         gzip: false
+#         tag: beta
+#         name: beta
+#         body: >
+#           Beta built off of the latest code in the repository. 
+#         files: >
+#           plugin/* 
