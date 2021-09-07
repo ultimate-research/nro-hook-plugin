@@ -26,8 +26,8 @@ pub fn handle_load_module(
 
     let name = unsafe { from_c_str(&(*out_module).Name as *const u8) };
     println!("[NRO hook] Loaded {}. BindFlag: {}", name, match flag {
-        0 => "Lazy",
         1 => "Now",
+        2 => "Lazy",
         _ => "Unknown"
     });
     let nro_info = NroInfo::new(&name, unsafe { &mut *out_module });
