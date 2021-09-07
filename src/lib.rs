@@ -20,14 +20,16 @@ pub fn handle_load_module(
     image: *const c_void, 
     buffer: *mut c_void, 
     buffer_size: size_t, 
-    _flag: c_int
+    flag: c_int
 ) -> c_int {
-    // use Flag_Now to ensure we aren't lazy loading NROs
-    // causes slower load times but is necessary for hooking
-    let ret = original!()(out_module, image, buffer, buffer_size, ro::BindFlag_BindFlag_Now as i32);
+    let ret = original!()(out_module, image, buffer, buffer_size, flag);
 
     let name = unsafe { from_c_str(&(*out_module).Name as *const u8) };
-    println!("[NRO hook] Loaded {}.", name);
+    println!("[NRO hook] Loaded {}. BindFlag: {}", name, match flag {
+        0 => "Lazy",
+        1 => "Now",
+        _ => "Unknown"
+    });
     let nro_info = NroInfo::new(&name, unsafe { &mut *out_module });
     for hook in LOAD_HOOKS.lock().iter() {
         hook(&nro_info)
