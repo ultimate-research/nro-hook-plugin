@@ -13,18 +13,14 @@ jobs:
       PLUGIN_NAME: nro_hook
     runs-on: ubuntu-latest
     container: 
-      image: devkitpro/devkita64:latest
+      image: jugeeya/cargo-skyline:2.1.0
     steps:
     - uses: actions/checkout@v2
-    - name: install
-      run: |
-        curl https://sh.rustup.rs -sSf > /tmp/rustup-init.sh     && chmod +x /tmp/rustup-init.sh     && sh /tmp/rustup-init.sh -y     && rm -rf /tmp/rustup-init.sh # buildkit
-    - name: install 2
-      run: |
-        apt update &&  apt install -y build-essential   apt-utils     curl     gcc     libssl-dev     cmake     pkg-config       &&  ~/.cargo/bin/rustup install stable && ~/.cargo/bin/cargo install cargo-skyline && ~/.cargo/bin/cargo skyline update-std
     - name: Build release NRO
       run: |
-        PATH=$PATH:/root/.cargo/bin:/opt/devkitpro/tools/bin  RUST_BACKTRACE=1 ~/.cargo/bin/cargo skyline build --release
+        PATH=$PATH:/root/.cargo/bin /root/.cargo/bin/cargo-skyline skyline build --release
+      env:
+        HOME: /root
     - name: Upload plugin artifact
       uses: actions/upload-artifact@v2
       with:
