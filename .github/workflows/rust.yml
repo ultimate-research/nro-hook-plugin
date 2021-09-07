@@ -1,32 +1,49 @@
-name: Rust Build
+name: Rust
 
 on:
   push:
     branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
 jobs:
-  build:
-
+  plugin:
+    env:
+      PLUGIN_NAME: nro_hook
     runs-on: ubuntu-latest
-
+    container: 
+      image: jugeeya/cargo-skyline:2.1.0
     steps:
     - uses: actions/checkout@v2
-    - name: Install cargo-skyline
-      run: cargo install --git https://github.com/jam1garner/cargo-skyline
-    - name: Install rust-std-skyline-squashed
-      run: cd .. && git clone https://github.com/jam1garner/rust-std-skyline-squashed && cd -
-    - name: Attempt to build
-      run: PATH=$PATH:/usr/share/rust/.rustup/toolchains/nightly-2020-04-10-x86_64-unknown-linux-gnu/lib/rustlib/x86_64-unknown-linux-gnu/bin cargo skyline build --release
-    - name: Update Release
+    - name: Build release NRO
+      run: |
+        PATH=$PATH:/root/.cargo/bin /root/.cargo/bin/cargo-skyline skyline build --release
       env:
-        PLUGIN_NAME: 'libnro_hook.nro'  #  change this to the name of your plugin
+        HOME: /root
+    - name: Upload plugin artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: plugin
+        path: target/aarch64-skyline-switch/release/lib${{env.PLUGIN_NAME}}.nro
+  upload:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master'
+    needs:
+      - plugin
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v2
+    - name: Update Release
       uses: meeDamian/github-release@2.0
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         prerelease: true
         allow_override: true
         gzip: false
-        tag: master
-        name: master
-        body: Build of ${{env.PLUGIN_NAME}} from master.
+        tag: beta
+        name: beta
+        body: >
+          Beta built off of the latest code in the repository. 
         files: >
-          ./target/aarch64-skyline-switch/release/${{env.PLUGIN_NAME}}
+          plugin/* 
