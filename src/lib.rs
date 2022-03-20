@@ -1,9 +1,11 @@
 #![feature(proc_macro_hygiene)]
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use skyline::{hook, install_hooks};
 use skyline::nn::ro;
 use skyline::libc::{c_void, c_int, size_t};
-use skyline::from_c_str;
+use skyline::try_from_c_str;
 
 use parking_lot::Mutex;
 
@@ -14,17 +16,22 @@ type Callback = fn(&NroInfo);
 static LOAD_HOOKS: Mutex<Vec<Callback>> = Mutex::new(Vec::new());
 static UNLOAD_HOOKS: Mutex<Vec<Callback>> = Mutex::new(Vec::new());
 
+static SHOULD_BIND_NOW: AtomicBool = AtomicBool::new(false);
+
 #[hook(replace = ro::LoadModule)]
 pub fn handle_load_module(
     out_module: *mut ro::Module, 
     image: *const c_void, 
     buffer: *mut c_void, 
     buffer_size: size_t, 
-    flag: c_int
+    mut flag: c_int
 ) -> c_int {
+    if SHOULD_BIND_NOW.load(Ordering::SeqCst) {
+        flag = 1;
+    }
     let ret = original!()(out_module, image, buffer, buffer_size, flag);
 
-    let name = unsafe { from_c_str(&(*out_module).Name as *const u8) };
+    let name = unsafe { try_from_c_str(&(*out_module).Name as *const u8).unwrap_or_else(|_| String::from("unknown")) };
     println!("[NRO hook] Loaded {}. BindFlag: {}", name, match flag {
         1 => "Now",
         2 => "Lazy",
@@ -42,7 +49,7 @@ pub fn handle_load_module(
 pub fn handle_unload_module(in_module: *mut ro::Module) -> c_int {
     let ret = original!()(in_module);
 
-    let name = unsafe { from_c_str(&(*in_module).Name as *const u8) };
+    let name = unsafe { try_from_c_str(&(*in_module).Name as *const u8).unwrap_or_else(|_| String::from("unknown")) };
     println!("[NRO hook] Unloaded {}.", name);
     let nro_info = NroInfo::new(&name, unsafe { &mut *in_module });
     for hook in UNLOAD_HOOKS.lock().iter() {
@@ -71,4 +78,9 @@ pub extern "Rust" fn add_nro_unload_hook(callback: Callback) {
     let mut hooks = UNLOAD_HOOKS.lock();
 
     hooks.push(callback);
+}
+
+#[no_mangle]
+pub extern "Rust" fn nro_request_bind_now() {
+    SHOULD_BIND_NOW.store(true, Ordering::SeqCst);
 }
